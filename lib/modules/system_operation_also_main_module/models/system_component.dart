@@ -1,13 +1,16 @@
+// lib/modules/system_operation_also_main_module/models/system_component.dart
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'data_point.dart';
 import 'package:experiment_planner/utils/circular_buffer.dart' as utils;
 
-// Create type alias to resolve conflict
 typedef ComponentBuffer<T> = utils.CircularBuffer<T>;
 
 enum ComponentStatus { normal, warning, error, ok }
 
 class SystemComponent {
+  final String id; // Changed from name to id for unique identification
+  final String machineId; // Added machineId
   final String name;
   final String description;
   ComponentStatus status;
@@ -16,15 +19,15 @@ class SystemComponent {
   final List<String> errorMessages;
   final Map<String, ComponentBuffer<DataPoint>> parameterHistory;
   bool isActivated;
-
   DateTime? lastCheckDate;
   final Map<String, double> minValues;
   final Map<String, double> maxValues;
 
   static const int MAX_HISTORY_SIZE = 100;
 
-
   SystemComponent({
+    String? id,
+    required this.machineId, // Required machineId
     required this.name,
     required this.description,
     this.status = ComponentStatus.normal,
@@ -35,17 +38,19 @@ class SystemComponent {
     this.lastCheckDate,
     Map<String, double>? minValues,
     Map<String, double>? maxValues,
-  })  : currentValues = Map.from(currentValues),
-        setValues = Map.from(setValues),
-        errorMessages = errorMessages ?? [],
-        minValues = minValues ?? {},
-        maxValues = maxValues ?? {},
-        parameterHistory = Map.fromEntries(
-          currentValues.keys.map(
-                (key) => MapEntry(key, ComponentBuffer<DataPoint>(MAX_HISTORY_SIZE)),
-          ),
-        );
+  }) : id = id ?? name, // Fallback to name if id is not provided for backward compatibility
+       currentValues = Map.from(currentValues),
+       setValues = Map.from(setValues),
+       errorMessages = errorMessages ?? [],
+       minValues = minValues ?? {},
+       maxValues = maxValues ?? {},
+       parameterHistory = Map.fromEntries(
+         currentValues.keys.map(
+           (key) => MapEntry(key, ComponentBuffer<DataPoint>(MAX_HISTORY_SIZE)),
+         ),
+       );
 
+  // Existing methods remain the same
   void updateCurrentValues(Map<String, double> values) {
     currentValues.addAll(values);
     values.forEach((parameter, value) {
@@ -84,6 +89,8 @@ class SystemComponent {
 
   factory SystemComponent.fromJson(Map<String, dynamic> json) {
     final component = SystemComponent(
+      id: json['id'] as String?,
+      machineId: json['machineId'] as String, // Added machineId
       name: json['name'] as String,
       description: json['description'] as String,
       status: ComponentStatus.values.firstWhere(
@@ -120,6 +127,8 @@ class SystemComponent {
   }
 
   Map<String, dynamic> toJson() => {
+    'id': id,
+    'machineId': machineId, // Added machineId
     'name': name,
     'description': description,
     'status': status.toString().split('.').last,
@@ -141,5 +150,4 @@ class SystemComponent {
 
   String get type => name;
   DateTime get lastMaintenanceDate => lastCheckDate!;
-  String get id => name;
 }
