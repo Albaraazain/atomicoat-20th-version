@@ -4,6 +4,7 @@ import '../models/recipe.dart';
 import '../models/system_component.dart';
 import '../providers/recipe_provider.dart';
 import '../providers/system_state_provider.dart';
+import '../../../services/auth_service.dart';
 
 class DarkThemeColors {
   static const Color background = Color(0xFF121212);
@@ -29,9 +30,11 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
   late TextEditingController _substrateController;
   late TextEditingController _chamberTempController;
   late TextEditingController _pressureController;
+  late TextEditingController _descriptionController;
   List<RecipeStep> _steps = [];
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
+  bool _isPublic = false;
 
   @override
   void initState() {
@@ -40,6 +43,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
     _substrateController = TextEditingController();
     _chamberTempController = TextEditingController();
     _pressureController = TextEditingController();
+    _descriptionController = TextEditingController();
     _animationController = AnimationController(
       vsync: this,
       duration: Duration(milliseconds: 300),
@@ -62,6 +66,8 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
           _substrateController.text = recipe.substrate;
           _chamberTempController.text = recipe.chamberTemperatureSetPoint.toString();
           _pressureController.text = recipe.pressureSetPoint.toString();
+          _descriptionController.text = recipe.description ?? '';
+          _isPublic = recipe.isPublic;
           _steps = List.from(recipe.steps);
         });
       } else {
@@ -78,6 +84,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
     _substrateController.dispose();
     _chamberTempController.dispose();
     _pressureController.dispose();
+    _descriptionController.dispose();
     _animationController.dispose();
     super.dispose();
   }
@@ -113,6 +120,10 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
                     children: [
                       _buildRecipeNameInput(),
                       SizedBox(height: 16),
+                      _buildDescriptionInput(),
+                      SizedBox(height: 16),
+                      _buildAccessControl(),
+                      SizedBox(height: 16),
                       _buildSubstrateInput(),
                       SizedBox(height: 24),
                       _buildGlobalParametersInputs(),
@@ -136,6 +147,65 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
       controller: _nameController,
       label: 'Recipe Name',
       icon: Icons.title,
+    );
+  }
+
+  Widget _buildDescriptionInput() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Description',
+          style: TextStyle(
+            color: DarkThemeColors.primaryText,
+            fontSize: 18,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        SizedBox(height: 16),
+        TextField(
+          controller: _descriptionController,
+          style: TextStyle(color: DarkThemeColors.primaryText),
+          maxLines: 3,
+          decoration: InputDecoration(
+            hintText: 'Enter recipe description',
+            hintStyle: TextStyle(color: DarkThemeColors.secondaryText),
+            filled: true,
+            fillColor: DarkThemeColors.inputFill,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: DarkThemeColors.accent),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAccessControl() {
+    return Row(
+      children: [
+        Text(
+          'Make Public',
+          style: TextStyle(
+            color: DarkThemeColors.primaryText,
+            fontSize: 16,
+          ),
+        ),
+        Switch(
+          value: _isPublic,
+          onChanged: (value) {
+            setState(() {
+              _isPublic = value;
+            });
+          },
+          activeColor: DarkThemeColors.accent,
+        ),
+      ],
     );
   }
 
@@ -754,66 +824,31 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
   }
 
   void _saveRecipe(RecipeProvider recipeProvider) async {
-    if (_nameController.text.isEmpty) {
-      _showValidationError('Please enter a recipe name');
-      return;
-    }
-
-    if (_substrateController.text.isEmpty) {
-      _showValidationError('Please enter a substrate');
-      return;
-    }
-
-    if (_steps.isEmpty) {
-      _showValidationError('Please add at least one step to the recipe');
-      return;
-    }
-
-    final newRecipe = Recipe(
-      id: widget.recipeId ?? DateTime
-          .now()
-          .millisecondsSinceEpoch
-          .toString(),
-      name: _nameController.text,
-      substrate: _substrateController.text,
-      steps: _steps,
-      chamberTemperatureSetPoint: double.tryParse(
-          _chamberTempController.text) ?? 150.0,
-      pressureSetPoint: double.tryParse(_pressureController.text) ?? 1.0,
-    );
-
     try {
+      final recipe = Recipe(
+        id: widget.recipeId ?? DateTime.now().millisecondsSinceEpoch.toString(),
+        name: _nameController.text,
+        steps: _steps,
+        substrate: _substrateController.text,
+        machineId: recipeProvider.currentMachineId!,
+        createdBy: context.read<AuthService>().currentUser!.uid,
+        chamberTemperatureSetPoint: double.parse(_chamberTempController.text),
+        pressureSetPoint: double.parse(_pressureController.text),
+        description: _descriptionController.text,
+        isPublic: _isPublic,
+      );
+
       if (widget.recipeId == null) {
-        await recipeProvider.addRecipe(newRecipe);
+        await recipeProvider.addRecipe(recipe);
       } else {
-        await recipeProvider.updateRecipe(newRecipe);
+        await recipeProvider.updateRecipe(recipe);
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Recipe saved successfully'),
-          backgroundColor: DarkThemeColors.accent,
-        ),
-      );
-
-      // Use Navigator.of(context).pop() only once
-      Navigator.of(context).pop(true);
+      Navigator.pop(context);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error saving recipe: $e'),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text('Error saving recipe: $e'), backgroundColor: Colors.red),
       );
     }
-  }
-
-  void _showValidationError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-      ),
-    );
   }
 }
