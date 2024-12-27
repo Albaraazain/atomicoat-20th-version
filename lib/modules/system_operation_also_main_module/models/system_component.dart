@@ -8,10 +8,8 @@ typedef ComponentBuffer<T> = utils.CircularBuffer<T>;
 
 enum ComponentStatus { normal, warning, error, ok }
 enum ValveType {
-  inlet,
-  outlet,
-  purge,
-  control
+  valveA,
+  valveB,
 }
 
 class SystemComponent {
