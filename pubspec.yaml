@@ -59,10 +59,13 @@ dependencies:
 
 
 
+  equatable: any
 dev_dependencies:
   flutter_test:
     sdk: flutter
 
+  firebase_core_platform_interface: any
+  plugin_platform_interface: any
 flutter:
   uses-material-design: true
   fonts:
