@@ -57,4 +57,14 @@ class RecipeProvider with ChangeNotifier {
     await _recipeRepository.cloneRecipe(currentMachineId!, recipe, newName);
     await loadRecipes();
   }
+
+  Future<Recipe?> getRecipeById(String recipeId) async {
+    if (currentMachineId == null) return null;
+    try {
+      return await _recipeRepository.getRecipeById(currentMachineId!, recipeId);
+    } catch (e) {
+      print('Error getting recipe by ID: $e');
+      return null;
+    }
+  }
 }
