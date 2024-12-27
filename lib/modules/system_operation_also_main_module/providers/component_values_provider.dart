@@ -1,7 +1,5 @@
 // lib/modules/system_operation_also_main_module/providers/component_values_provider.dart
 
-import 'package:flutter/foundation.dart';
-import '../models/system_component.dart';
 import '../models/data_point.dart';
 import '../../../utils/circular_buffer.dart';
 import 'base_component_provider.dart';
