@@ -72,7 +72,7 @@ class SystemStateProvider with ChangeNotifier {
 
   // Initialize all system components with their parameters
   void _initializeComponents() {
-    _componentManager.initializeDefaultComponents();
+    _componentManager.initializeDefaultComponents(_currentMachineId ?? '');
   }
 
   // Load system log from repository
