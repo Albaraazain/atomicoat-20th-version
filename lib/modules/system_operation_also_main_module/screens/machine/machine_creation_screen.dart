@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/machine.dart';
 import '../../../../repositories/machine_repository.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class MachineCreationScreen extends StatefulWidget {
   const MachineCreationScreen({Key? key}) : super(key: key);
@@ -12,6 +13,7 @@ class MachineCreationScreen extends StatefulWidget {
 class _MachineCreationScreenState extends State<MachineCreationScreen> {
   final _formKey = GlobalKey<FormState>();
   final _machineRepository = MachineRepository();
+  final _firestore = FirebaseFirestore.instance;
 
   String _serialNumber = '';
   String _location = '';
@@ -19,7 +21,7 @@ class _MachineCreationScreenState extends State<MachineCreationScreen> {
   String _labInstitution = '';
   String _model = '';
   String _machineType = '';
-  String _adminId = '';
+  String _adminEmail = '';
   Map<String, dynamic> _specifications = {};
 
   bool _isLoading = false;
@@ -51,6 +53,17 @@ class _MachineCreationScreenState extends State<MachineCreationScreen> {
                     ),
                     const SizedBox(height: 16),
                     _buildTextFormField(
+                      label: 'Location',
+                      onSaved: (value) => _location = value ?? '',
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter a location';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    _buildTextFormField(
                       label: 'Lab Name',
                       onSaved: (value) => _labName = value ?? '',
                       validator: (value) {
@@ -62,22 +75,11 @@ class _MachineCreationScreenState extends State<MachineCreationScreen> {
                     ),
                     const SizedBox(height: 16),
                     _buildTextFormField(
-                      label: 'Institution',
+                      label: 'Lab Institution',
                       onSaved: (value) => _labInstitution = value ?? '',
                       validator: (value) {
                         if (value == null || value.isEmpty) {
-                          return 'Please enter an institution name';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    _buildTextFormField(
-                      label: 'Location',
-                      onSaved: (value) => _location = value ?? '',
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter a location';
+                          return 'Please enter a lab institution';
                         }
                         return null;
                       },
@@ -106,17 +108,29 @@ class _MachineCreationScreenState extends State<MachineCreationScreen> {
                     ),
                     const SizedBox(height: 16),
                     _buildTextFormField(
-                      label: 'Admin ID',
-                      onSaved: (value) => _adminId = value ?? '',
+                      label: 'Admin Email',
+                      onSaved: (value) => _adminEmail = value ?? '',
                       validator: (value) {
                         if (value == null || value.isEmpty) {
-                          return 'Please enter an admin ID';
+                          return 'Please enter an admin email';
+                        }
+                        if (!value.contains('@')) {
+                          return 'Please enter a valid email address';
                         }
                         return null;
                       },
                     ),
                     const SizedBox(height: 16),
-                    _buildSpecificationsSection(),
+                    _buildTextFormField(
+                      label: 'Additional Specifications',
+                      onSaved: (value) {
+                        if (value != null && value.isNotEmpty) {
+                          _specifications['additional'] = value;
+                        }
+                      },
+                      validator: (value) => null,
+                      maxLines: 3,
+                    ),
                     const SizedBox(height: 24),
                     ElevatedButton(
                       onPressed: _submitForm,
@@ -131,68 +145,34 @@ class _MachineCreationScreenState extends State<MachineCreationScreen> {
 
   Widget _buildTextFormField({
     required String label,
-    required void Function(String?) onSaved,
+    required Function(String?) onSaved,
     required String? Function(String?) validator,
-    int maxLines = 1,
+    int? maxLines,
   }) {
     return TextFormField(
       decoration: InputDecoration(
         labelText: label,
         border: const OutlineInputBorder(),
       ),
-      maxLines: maxLines,
+      maxLines: maxLines ?? 1,
       onSaved: onSaved,
       validator: validator,
     );
   }
 
-  Widget _buildSpecificationsSection() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Machine Specifications',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            // Add specification fields here
-            _buildTextFormField(
-              label: 'Chamber Temperature Range',
-              onSaved: (value) {
-                if (value != null && value.isNotEmpty) {
-                  _specifications['chamberTempRange'] = value;
-                }
-              },
-              validator: (value) => null,
-            ),
-            const SizedBox(height: 8),
-            _buildTextFormField(
-              label: 'Pressure Range',
-              onSaved: (value) {
-                if (value != null && value.isNotEmpty) {
-                  _specifications['pressureRange'] = value;
-                }
-              },
-              validator: (value) => null,
-            ),
-            const SizedBox(height: 8),
-            _buildTextFormField(
-              label: 'Additional Specifications',
-              onSaved: (value) {
-                if (value != null && value.isNotEmpty) {
-                  _specifications['additional'] = value;
-                }
-              },
-              validator: (value) => null,
-              maxLines: 3,
-            ),
-          ],
-        ),
-      ),
-    );
+  Future<String?> _getAdminIdFromEmail(String email) async {
+    final userQuery = await _firestore
+        .collection('users')
+        .where('email', isEqualTo: email)
+        .where('role', isEqualTo: 'admin')
+        .limit(1)
+        .get();
+
+    if (userQuery.docs.isEmpty) {
+      return null;
+    }
+
+    return userQuery.docs.first.id;
   }
 
   Future<void> _submitForm() async {
@@ -207,6 +187,11 @@ class _MachineCreationScreenState extends State<MachineCreationScreen> {
     try {
       _formKey.currentState!.save();
 
+      final adminId = await _getAdminIdFromEmail(_adminEmail);
+      if (adminId == null) {
+        throw Exception('Admin email not found or user is not an admin');
+      }
+
       final machine = Machine(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         serialNumber: _serialNumber,
@@ -217,7 +202,7 @@ class _MachineCreationScreenState extends State<MachineCreationScreen> {
         machineType: _machineType,
         installDate: DateTime.now(),
         lastMaintenance: DateTime.now(),
-        adminId: _adminId,
+        adminId: adminId,
         specifications: _specifications,
       );
 

@@ -119,8 +119,8 @@ class MachineRepository extends BaseRepository<Machine> {
     await getCollection().doc(machineId).update(updates);
   }
 
-  // Add user to machine with role and status
-  Future<void> addUserToMachine(String machineId, String userId, String role) async {
+  // Add user to machine with role and status - Only called after request approval
+  Future<void> addApprovedUserToMachine(String machineId, String userId, String role) async {
     await _firestore
         .collection('machines')
         .doc(machineId)
@@ -203,5 +203,30 @@ class MachineRepository extends BaseRepository<Machine> {
         .update({
           'lastAccess': FieldValue.serverTimestamp(),
         });
+  }
+
+  // Get machine by serial number
+  Future<String?> getMachineIdBySerial(String serialNumber) async {
+    final QuerySnapshot snapshot = await getCollection()
+        .where('serialNumber', isEqualTo: serialNumber)
+        .limit(1)
+        .get();
+
+    if (snapshot.docs.isEmpty) {
+      return null;
+    }
+
+    return snapshot.docs.first.id;
+  }
+
+  // Get machine admin
+  Future<String?> getMachineAdmin(String machineId) async {
+    final machineDoc = await getCollection().doc(machineId).get();
+    if (!machineDoc.exists) {
+      return null;
+    }
+
+    final data = machineDoc.data() as Map<String, dynamic>;
+    return data['adminId'] as String?;
   }
 }
