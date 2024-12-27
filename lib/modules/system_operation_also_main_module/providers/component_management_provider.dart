@@ -6,15 +6,13 @@ import 'base_component_provider.dart';
 
 
 class ComponentManagementProvider extends BaseComponentProvider {
-  String? _currentMachineId; // Add current machine context
+  String? _currentMachineId;
 
-  // Setter for current machine
   void setCurrentMachine(String machineId) {
     _currentMachineId = machineId;
     notifyListeners();
   }
 
-  // Getter for current machine
   String? get currentMachineId => _currentMachineId;
 
   // Override CRUD Operations with machineId support
@@ -25,13 +23,9 @@ class ComponentManagementProvider extends BaseComponentProvider {
         throw ArgumentError('machineId is required');
       }
 
-      final loadedComponents = await repository.getAll(userId: userId);
+      final machine = await repository.getMachineComponents(machineId);
       componentsMap.clear();
-      for (var component in loadedComponents) {
-        if (component.machineId == machineId) {
-          componentsMap[component.id] = component;
-        }
-      }
+      componentsMap.addAll(machine);
       notifyListeners();
     } catch (e) {
       print('Error fetching components: $e');
@@ -44,11 +38,25 @@ class ComponentManagementProvider extends BaseComponentProvider {
       if (component.machineId != _currentMachineId) {
         throw ArgumentError('Component machineId does not match current machine');
       }
-      await repository.add(component.id, component, userId: userId);
+      await repository.updateMachineComponent(_currentMachineId!, component);
       componentsMap[component.id] = component;
       notifyListeners();
     } catch (e) {
       print('Error adding component: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> removeComponent(String componentId, {String? userId}) async {
+    try {
+      if (_currentMachineId == null) {
+        throw ArgumentError('No machine selected');
+      }
+      await repository.removeMachineComponent(_currentMachineId!, componentId);
+      componentsMap.remove(componentId);
+      notifyListeners();
+    } catch (e) {
+      print('Error removing component: $e');
       rethrow;
     }
   }
@@ -190,17 +198,6 @@ class ComponentManagementProvider extends BaseComponentProvider {
       }
       component.parameterHistory[parameter]?.add(dataPoint);
       notifyListeners();
-    }
-  }
-
-  Future<void> removeComponent(String componentId, {String? userId}) async {
-    try {
-      await repository.delete(componentId, userId: userId);
-      componentsMap.remove(componentId);
-      notifyListeners();
-    } catch (e) {
-      print('Error removing component: $e');
-      rethrow;
     }
   }
 
