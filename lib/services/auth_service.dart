@@ -80,39 +80,45 @@ class AuthService {
     required String machineSerial
   }) async {
     try {
+      // First validate the machine serial
+      bool isValidSerial = await _machineSerialRepository.isSerialNumberValid(machineSerial);
+      if (!isValidSerial) {
+        throw Exception('Invalid machine serial number');
+      }
+
+      // Create the user account
       UserCredential result = await _auth.createUserWithEmailAndPassword(
           email: email, password: password);
       User? user = result.user;
 
       if (user != null) {
+        // Create the access request
         UserRequest request = UserRequest(
           userId: user.uid,
           email: email,
           name: name,
           machineSerial: machineSerial,
+          message: 'New user registration request',
         );
         await _userRequestRepository.createUserRequest(request);
 
-        // Create user document in Firestore
+        // Create initial user document with pending status
         await _firestore.collection('users').doc(user.uid).set({
           'name': name,
           'email': email,
           'machineSerial': machineSerial,
           'status': 'pending',
-          'role': 'user',  // Set default role to 'user'
+          'role': 'user',
           'createdAt': FieldValue.serverTimestamp(),
         });
-
-        await _machineSerialRepository.assignUserToMachine(machineSerial, user.uid);
       }
 
       return user;
     } catch (e) {
       print('Error during sign up: $e');
-      return null;
+      rethrow;
     }
   }
-
 
   // Sign in with email and password
   Future<User?> signIn({required String email, required String password}) async {
