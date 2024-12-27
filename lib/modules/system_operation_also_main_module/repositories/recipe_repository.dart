@@ -71,4 +71,22 @@ class RecipeRepository {
 
     await createRecipe(machineId, newRecipe);
   }
+
+  Future<Recipe?> getRecipeById(String machineId, String recipeId) async {
+    try {
+      final doc = await _firestore
+          .collection('machines')
+          .doc(machineId)
+          .collection('recipes')
+          .doc(recipeId)
+          .get();
+
+      if (!doc.exists) return null;
+
+      return Recipe.fromJson(doc.data() as Map<String, dynamic>);
+    } catch (e) {
+      print('Error getting recipe by ID: $e');
+      return null;
+    }
+  }
 }
