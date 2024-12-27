@@ -28,17 +28,28 @@ class ExperimentRepository extends BaseRepository<Experiment> {
       });
 
       // Create the experiment document
-      transaction.set(experimentRef, experiment.toJson());
+      transaction.set(experimentRef, {
+        ...experiment.toJson(),
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      // Create monitoring configuration document
+      transaction.set(
+        experimentRef.collection('monitoring').doc('config'),
+        experiment.monitoringConfig,
+      );
     });
   }
 
-  // Update experiment status
+  // Update experiment status and details
   Future<void> updateExperimentStatus(
     String machineId,
     String experimentId,
     ExperimentStatus status, {
     int? completedCycles,
     DateTime? endTime,
+    Map<String, dynamic>? results,
+    String? notes,
   }) async {
     final experimentRef = _firestore
         .collection('machines')
@@ -48,8 +59,11 @@ class ExperimentRepository extends BaseRepository<Experiment> {
 
     final updates = {
       'status': status.toString().split('.').last,
+      'lastUpdated': FieldValue.serverTimestamp(),
       if (completedCycles != null) 'completedCycles': completedCycles,
       if (endTime != null) 'endTime': Timestamp.fromDate(endTime),
+      if (results != null) 'results': results,
+      if (notes != null) 'notes': notes,
     };
 
     if (status == ExperimentStatus.completed || status == ExperimentStatus.failed) {
@@ -74,16 +88,18 @@ class ExperimentRepository extends BaseRepository<Experiment> {
     String experimentId,
     Map<String, dynamic> componentStates,
   ) async {
-    await _firestore
+    final monitoringRef = _firestore
         .collection('machines')
         .doc(machineId)
         .collection('experiments')
         .doc(experimentId)
-        .collection('monitoring_data')
-        .add({
-          'timestamp': FieldValue.serverTimestamp(),
-          'componentStates': componentStates,
-        });
+        .collection('monitoring_data');
+
+    await monitoringRef.add({
+      'timestamp': FieldValue.serverTimestamp(),
+      'componentStates': componentStates,
+      'cycle': componentStates['currentCycle'],
+    });
   }
 
   // Get experiment by ID
@@ -140,6 +156,7 @@ class ExperimentRepository extends BaseRepository<Experiment> {
     String experimentId, {
     DateTime? start,
     DateTime? end,
+    int? cycle,
   }) async {
     var query = _firestore
         .collection('machines')
@@ -149,14 +166,70 @@ class ExperimentRepository extends BaseRepository<Experiment> {
         .collection('monitoring_data')
         .orderBy('timestamp');
 
-    if (start != null) {
-      query = query.where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(start));
-    }
-    if (end != null) {
-      query = query.where('timestamp', isLessThanOrEqualTo: Timestamp.fromDate(end));
+    if (cycle != null) {
+      query = query.where('cycle', isEqualTo: cycle);
+    } else {
+      if (start != null) {
+        query = query.where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(start));
+      }
+      if (end != null) {
+        query = query.where('timestamp', isLessThanOrEqualTo: Timestamp.fromDate(end));
+      }
     }
 
     final snapshot = await query.get();
     return snapshot.docs.map((doc) => doc.data()).toList();
+  }
+
+  // Get monitoring configuration
+  Future<Map<String, dynamic>> getMonitoringConfig(String machineId, String experimentId) async {
+    final doc = await _firestore
+        .collection('machines')
+        .doc(machineId)
+        .collection('experiments')
+        .doc(experimentId)
+        .collection('monitoring')
+        .doc('config')
+        .get();
+
+    return doc.data() ?? {};
+  }
+
+  // Update monitoring configuration
+  Future<void> updateMonitoringConfig(
+    String machineId,
+    String experimentId,
+    Map<String, dynamic> config,
+  ) async {
+    await _firestore
+        .collection('machines')
+        .doc(machineId)
+        .collection('experiments')
+        .doc(experimentId)
+        .collection('monitoring')
+        .doc('config')
+        .set(config, SetOptions(merge: true));
+  }
+
+  // Get experiments by date range
+  Future<List<Experiment>> getExperimentsByDateRange(
+    String machineId,
+    DateTime start,
+    DateTime end,
+  ) async {
+    final snapshot = await _firestore
+        .collection('machines')
+        .doc(machineId)
+        .collection('experiments')
+        .where('startTime', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
+        .where('startTime', isLessThanOrEqualTo: Timestamp.fromDate(end))
+        .orderBy('startTime', descending: true)
+        .get();
+
+    return snapshot.docs.map((doc) {
+      final data = doc.data();
+      data['id'] = doc.id;
+      return Experiment.fromJson(data);
+    }).toList();
   }
 }
