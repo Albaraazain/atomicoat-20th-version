@@ -117,11 +117,11 @@ class RecipeRepository extends BaseRepository<Recipe> {
       name: newName,
       steps: List.from(recipe.steps),
       substrate: recipe.substrate,
+      createdAt: DateTime.now(),
       machineId: recipe.machineId,
       createdBy: recipe.createdBy,
       chamberTemperatureSetPoint: recipe.chamberTemperatureSetPoint,
       pressureSetPoint: recipe.pressureSetPoint,
-      version: 1,
       description: '${recipe.description ?? ''} (Cloned)',
       isPublic: false,
     );
