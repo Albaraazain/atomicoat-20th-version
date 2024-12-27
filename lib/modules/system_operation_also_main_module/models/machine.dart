@@ -1,6 +1,7 @@
 // lib/modules/system_operation_also_main_module/models/machine.dart
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'system_component.dart';
 
 enum MachineStatus {
   offline,    // Machine is not connected
@@ -26,6 +27,7 @@ class Machine {
   final String adminId;         // ID of the machine admin
   final bool isActive;          // Whether the machine is active in the system
   final Map<String, dynamic> specifications; // Machine specifications
+  final Map<String, SystemComponent> components; // Machine components
 
   Machine({
     required this.id,
@@ -43,28 +45,41 @@ class Machine {
     required this.adminId,
     this.isActive = true,
     this.specifications = const {},
+    this.components = const {},
   });
 
   factory Machine.fromJson(Map<String, dynamic> json) {
+    Map<String, SystemComponent> componentsMap = {};
+    if (json['components'] != null) {
+      (json['components'] as Map<String, dynamic>).forEach((key, value) {
+        componentsMap[key] = SystemComponent.fromJson(value as Map<String, dynamic>);
+      });
+    }
+
     return Machine(
-      id: json['id'] as String,
-      serialNumber: json['serialNumber'] as String,
-      location: json['location'] as String,
+      id: json['id'] as String? ?? '',
+      serialNumber: json['serialNumber'] as String? ?? '',
+      location: json['location'] as String? ?? '',
       labName: json['labName'] as String? ?? '',
       labInstitution: json['labInstitution'] as String? ?? '',
-      model: json['model'] as String,
+      model: json['model'] as String? ?? '',
       machineType: json['machineType'] as String? ?? '',
-      installDate: (json['installDate'] as Timestamp).toDate(),
+      installDate: json['installDate'] != null
+          ? (json['installDate'] as Timestamp).toDate()
+          : DateTime.now(),
       status: MachineStatus.values.firstWhere(
         (e) => e.toString() == 'MachineStatus.${json['status']}',
         orElse: () => MachineStatus.offline,
       ),
       currentOperator: json['currentOperator'] as String?,
       currentExperiment: json['currentExperiment'] as String?,
-      lastMaintenance: (json['lastMaintenance'] as Timestamp).toDate(),
-      adminId: json['adminId'] as String,
+      lastMaintenance: json['lastMaintenance'] != null
+          ? (json['lastMaintenance'] as Timestamp).toDate()
+          : DateTime.now(),
+      adminId: json['adminId'] as String? ?? '',
       isActive: json['isActive'] as bool? ?? true,
       specifications: json['specifications'] as Map<String, dynamic>? ?? {},
+      components: componentsMap,
     );
   }
 
@@ -84,6 +99,7 @@ class Machine {
     'adminId': adminId,
     'isActive': isActive,
     'specifications': specifications,
+    'components': components.map((key, value) => MapEntry(key, value.toJson())),
   };
 
   Machine copyWith({
@@ -102,6 +118,7 @@ class Machine {
     String? adminId,
     bool? isActive,
     Map<String, dynamic>? specifications,
+    Map<String, SystemComponent>? components,
   }) {
     return Machine(
       id: id ?? this.id,
@@ -119,6 +136,7 @@ class Machine {
       adminId: adminId ?? this.adminId,
       isActive: isActive ?? this.isActive,
       specifications: specifications ?? Map<String, dynamic>.from(this.specifications),
+      components: components ?? Map<String, SystemComponent>.from(this.components),
     );
   }
 }
