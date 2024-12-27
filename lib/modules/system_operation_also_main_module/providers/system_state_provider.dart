@@ -19,9 +19,9 @@ import 'recipe_provider.dart';
 import 'component_management_provider.dart';
 import 'component_status_provider.dart';
 import 'component_values_provider.dart';
-import '../models/component_state.dart';
 
 class SystemStateProvider with ChangeNotifier {
+  String? _currentMachineId;
   final ComponentManagementProvider _componentManager;
   final ComponentStatusProvider _componentStatus;
   final ComponentValuesProvider _componentValues;
