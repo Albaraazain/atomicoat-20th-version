@@ -5,7 +5,7 @@ import '../modules/system_operation_also_main_module/models/machine.dart';
 import 'base_repository.dart';
 
 class MachineRepository extends BaseRepository<Machine> {
-  MachineRepository() : super('machines');
+  MachineRepository({FirebaseFirestore? firestore}) : super('machines', firestore: firestore);
 
   @override
   Machine fromJson(Map<String, dynamic> json) => Machine.fromJson(json);
