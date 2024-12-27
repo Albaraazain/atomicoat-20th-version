@@ -8,99 +8,144 @@ import '../models/recipe.dart';
 class RecipeProvider with ChangeNotifier {
   final RecipeRepository _recipeRepository = RecipeRepository();
   final AuthService _authService;
+  String? _currentMachineId;
   List<Recipe> _recipes = [];
+  List<Recipe> _publicRecipes = [];
 
   List<Recipe> get recipes => _recipes;
+  List<Recipe> get publicRecipes => _publicRecipes;
+  String? get currentMachineId => _currentMachineId;
 
-  RecipeProvider(this._authService) {
-    loadRecipes();
+  RecipeProvider(this._authService);
+
+  // Set current machine and load its recipes
+  Future<void> setCurrentMachine(String machineId) async {
+    _currentMachineId = machineId;
+    await loadRecipes();
   }
 
+  // Load recipes for current machine
   Future<void> loadRecipes() async {
     try {
-      String? userId = _authService.currentUser?.uid;
-      if (userId != null) {
-        _recipes = await _recipeRepository.getAll(userId: userId);
-        notifyListeners();
-      }
+      if (_currentMachineId == null) return;
+
+      // Load machine's recipes
+      _recipes = await _recipeRepository.getMachineRecipes(_currentMachineId!);
+
+      // Load public recipes
+      _publicRecipes = await _recipeRepository.getPublicRecipes(_currentMachineId!);
+
+      notifyListeners();
     } catch (e) {
       print('Error loading recipes: $e');
     }
   }
 
+  // Add new recipe
   Future<void> addRecipe(Recipe recipe) async {
     try {
       String? userId = _authService.currentUser?.uid;
-      if (userId != null) {
-        await _recipeRepository.add(recipe.id, recipe, userId: userId);
-        _recipes.add(recipe);
-        notifyListeners();
+      if (userId == null || _currentMachineId == null) return;
+
+      // Set creator and machine ID
+      recipe.createdBy = userId;
+      recipe.machineId = _currentMachineId!;
+
+      await _recipeRepository.createRecipe(recipe);
+      _recipes.add(recipe);
+      if (recipe.isPublic) {
+        _publicRecipes.add(recipe);
       }
+      notifyListeners();
     } catch (e) {
       print('Error adding recipe: $e');
       rethrow;
     }
   }
 
+  // Update existing recipe
   Future<void> updateRecipe(Recipe updatedRecipe) async {
     try {
-      String? userId = _authService.currentUser?.uid;
-      if (userId != null) {
-        await _recipeRepository.update(updatedRecipe.id, updatedRecipe, userId: userId);
-        int index = _recipes.indexWhere((recipe) => recipe.id == updatedRecipe.id);
-        if (index != -1) {
-          _recipes[index] = updatedRecipe;
-          notifyListeners();
-        } else {
-          throw Exception('Recipe not found for update');
-        }
+      await _recipeRepository.updateRecipe(updatedRecipe);
+
+      // Update in local lists
+      int index = _recipes.indexWhere((recipe) => recipe.id == updatedRecipe.id);
+      if (index != -1) {
+        _recipes[index] = updatedRecipe;
       }
+
+      if (updatedRecipe.isPublic) {
+        int publicIndex = _publicRecipes.indexWhere((recipe) => recipe.id == updatedRecipe.id);
+        if (publicIndex != -1) {
+          _publicRecipes[publicIndex] = updatedRecipe;
+        } else {
+          _publicRecipes.add(updatedRecipe);
+        }
+      } else {
+        _publicRecipes.removeWhere((recipe) => recipe.id == updatedRecipe.id);
+      }
+
+      notifyListeners();
     } catch (e) {
       print('Error updating recipe: $e');
       rethrow;
     }
   }
 
-
-  Future<void> deleteRecipe(String id) async {
+  // Delete recipe
+  Future<void> deleteRecipe(String recipeId) async {
     try {
-      String? userId = _authService.currentUser?.uid;
-      if (userId != null) {
-        await _recipeRepository.delete(id, userId: userId);
-        _recipes.removeWhere((recipe) => recipe.id == id);
-        notifyListeners();
-      }
+      if (_currentMachineId == null) return;
+
+      await _recipeRepository.deleteRecipe(_currentMachineId!, recipeId);
+      _recipes.removeWhere((recipe) => recipe.id == recipeId);
+      _publicRecipes.removeWhere((recipe) => recipe.id == recipeId);
+      notifyListeners();
     } catch (e) {
       print('Error deleting recipe: $e');
       rethrow;
     }
   }
 
-  Recipe? getRecipeById(String id) {
+  // Get recipe by ID
+  Recipe? getRecipeById(String recipeId) {
     try {
-      return _recipes.firstWhere((recipe) => recipe.id == id);
+      return _recipes.firstWhere((recipe) => recipe.id == recipeId);
     } catch (e) {
       print('Recipe not found: $e');
       return null;
     }
   }
 
+  // Clone recipe
+  Future<Recipe?> cloneRecipe(Recipe recipe, String newName) async {
+    try {
+      if (_currentMachineId == null) return null;
 
-
-  List<Recipe> getRecipeVersions(String id) {
-    return _recipes.where((recipe) => recipe.id == id).toList();
-  }
-
-  Recipe? getPreviousVersion(String id, int currentVersion) {
-    List<Recipe> versions = getRecipeVersions(id);
-    versions.sort((a, b) => b.version.compareTo(a.version));
-    int index = versions.indexWhere((recipe) => recipe.version == currentVersion);
-    if (index > 0 && index < versions.length) {
-      return versions[index + 1];
+      final newRecipe = await _recipeRepository.cloneRecipe(recipe, newName);
+      _recipes.add(newRecipe);
+      notifyListeners();
+      return newRecipe;
+    } catch (e) {
+      print('Error cloning recipe: $e');
+      return null;
     }
-    return null;
   }
 
+  // Get recipes by user
+  Future<List<Recipe>> getUserRecipes() async {
+    try {
+      String? userId = _authService.currentUser?.uid;
+      if (userId == null) return [];
+
+      return await _recipeRepository.getUserRecipes(userId);
+    } catch (e) {
+      print('Error getting user recipes: $e');
+      return [];
+    }
+  }
+
+  // Compare recipe versions
   Map<String, dynamic> compareRecipeVersions(Recipe oldVersion, Recipe newVersion) {
     Map<String, dynamic> differences = {};
 
