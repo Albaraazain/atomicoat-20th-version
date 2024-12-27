@@ -1,3 +1,4 @@
+import 'package:experiment_planner/modules/system_operation_also_main_module/models/system_component.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/recipe.dart';
