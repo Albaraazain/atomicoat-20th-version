@@ -779,5 +779,95 @@ class SystemStateProvider with ChangeNotifier {
   Future<void> updateComponentCurrentValues(String componentName, Map<String, double> newStates) {
     return _componentValues.updateComponentCurrentValues(componentName, newStates);
   }
+
+  // Error handling and recovery
+  Future<void> handleSystemError(String error, {bool isCritical = false}) async {
+    String? userId = _authService.currentUserId;
+    if (userId == null) return;
+
+    // Log the error
+    addLogEntry('System Error: $error',
+      isCritical ? ComponentStatus.error : ComponentStatus.warning);
+
+    // Create an alarm
+    final alarm = Alarm(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      message: error,
+      severity: isCritical ? AlarmSeverity.critical : AlarmSeverity.warning,
+      timestamp: DateTime.now(),
+    );
+    _alarmBloc.add(AddAlarmEvent(alarm, userId));
+
+    if (isCritical) {
+      // Stop the system for critical errors
+      await emergencyStop();
+    } else {
+      // For non-critical errors, try to recover
+      await attemptSystemRecovery();
+    }
+  }
+
+  Future<void> attemptSystemRecovery() async {
+    addLogEntry('Attempting system recovery...', ComponentStatus.warning);
+
+    try {
+      // Check and reset component states
+      for (var component in _componentManager.components.values) {
+        if (component.status == ComponentStatus.error) {
+          await _componentStatus.updateComponentStatus(
+            component.id,
+            ComponentStatus.warning
+          );
+        }
+      }
+
+      // Verify system stability
+      if (checkSystemReadiness()) {
+        addLogEntry('System recovery successful', ComponentStatus.normal);
+      } else {
+        throw Exception('System recovery failed - manual intervention required');
+      }
+    } catch (e) {
+      handleSystemError(e.toString(), isCritical: true);
+    }
+  }
+
+  // System health check
+  Future<bool> performSystemHealthCheck() async {
+    addLogEntry('Performing system health check...', ComponentStatus.normal);
+
+    try {
+      // Check component states
+      for (var component in _componentManager.components.values) {
+        if (!component.isActivated) continue;
+
+        // Verify component values are within acceptable ranges
+        for (var entry in component.currentValues.entries) {
+          final setValue = component.setValues[entry.key] ?? 0.0;
+          final currentValue = entry.value;
+
+          if ((currentValue - setValue).abs() > (setValue * 0.1)) {
+            addLogEntry(
+              'Component ${component.name} parameter ${entry.key} out of range',
+              ComponentStatus.warning
+            );
+            return false;
+          }
+        }
+      }
+
+      // Check system pressure
+      if (!isReactorPressureNormal()) {
+        addLogEntry('Abnormal reactor pressure detected', ComponentStatus.warning);
+        return false;
+      }
+
+      addLogEntry('System health check passed', ComponentStatus.normal);
+      return true;
+    } catch (e) {
+      handleSystemError('Health check failed: ${e.toString()}');
+      return false;
+    }
+  }
 }
 
