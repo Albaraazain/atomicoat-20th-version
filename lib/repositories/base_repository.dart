@@ -3,9 +3,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 abstract class BaseRepository<T> {
   final String collectionName;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseFirestore _firestore;
 
-  BaseRepository(this.collectionName);
+  BaseRepository(this.collectionName, {FirebaseFirestore? firestore})
+      : _firestore = firestore ?? FirebaseFirestore.instance;
 
   // Get the collection reference for the collection name provided in the constructor of the repository. for example, if the collection name is 'users', the collection reference will be 'users'.
   CollectionReference getCollection() => _firestore.collection(collectionName);
