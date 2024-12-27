@@ -24,10 +24,20 @@ class MachineRepository extends BaseRepository<Machine> {
     // Then get machines where user is in users subcollection
     final userMachinesSnapshot = await _firestore.collectionGroup('users')
         .where('userId', isEqualTo: userId)
+        .where('status', isEqualTo: 'active')  // Only get active users
         .get();
 
     // Get the parent machine documents for user machines
     final userMachineIds = userMachinesSnapshot.docs.map((doc) => doc.reference.parent.parent!.id).toList();
+
+    if (userMachineIds.isEmpty) {
+      return adminSnapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        data['id'] = doc.id;
+        return Machine.fromJson(data);
+      }).toList();
+    }
+
     final userMachinesQuery = await getCollection()
         .where(FieldPath.documentId, whereIn: userMachineIds)
         .get();
@@ -37,6 +47,20 @@ class MachineRepository extends BaseRepository<Machine> {
     final uniqueDocs = allDocs.toSet().toList();
 
     return uniqueDocs.map((doc) {
+      final data = doc.data() as Map<String, dynamic>;
+      data['id'] = doc.id;
+      return Machine.fromJson(data);
+    }).toList();
+  }
+
+  // Get machines by lab
+  Future<List<Machine>> getMachinesByLab(String labName, String institution) async {
+    final QuerySnapshot snapshot = await getCollection()
+        .where('labName', isEqualTo: labName)
+        .where('labInstitution', isEqualTo: institution)
+        .get();
+
+    return snapshot.docs.map((doc) {
       final data = doc.data() as Map<String, dynamic>;
       data['id'] = doc.id;
       return Machine.fromJson(data);
@@ -54,12 +78,13 @@ class MachineRepository extends BaseRepository<Machine> {
   Future<void> setCurrentOperator(String machineId, String? operatorId, {String? experimentId}) async {
     final updates = {
       'currentOperator': operatorId,
+      'status': operatorId != null ? MachineStatus.running.toString().split('.').last : MachineStatus.idle.toString().split('.').last,
       if (experimentId != null) 'currentExperiment': experimentId,
     };
     await getCollection().doc(machineId).update(updates);
   }
 
-  // Add user to machine
+  // Add user to machine with role and status
   Future<void> addUserToMachine(String machineId, String userId, String role) async {
     await _firestore
         .collection('machines')
@@ -69,42 +94,41 @@ class MachineRepository extends BaseRepository<Machine> {
         .set({
           'userId': userId,
           'role': role,
+          'status': 'active',
           'addedAt': FieldValue.serverTimestamp(),
+          'lastAccess': FieldValue.serverTimestamp(),
         });
   }
 
-  // Remove user from machine
-  Future<void> removeUserFromMachine(String machineId, String userId) async {
+  // Update user status (active/inactive)
+  Future<void> updateUserStatus(String machineId, String userId, String status) async {
     await _firestore
         .collection('machines')
         .doc(machineId)
         .collection('users')
         .doc(userId)
-        .delete();
+        .update({
+          'status': status,
+          'lastModified': FieldValue.serverTimestamp(),
+        });
   }
 
-  // Get all users for a machine
+  // Remove user from machine
+  Future<void> removeUserFromMachine(String machineId, String userId) async {
+    // Instead of deleting, mark as inactive
+    await updateUserStatus(machineId, userId, 'inactive');
+  }
+
+  // Get all active users for a machine
   Future<List<Map<String, dynamic>>> getMachineUsers(String machineId) async {
     final snapshot = await _firestore
         .collection('machines')
         .doc(machineId)
         .collection('users')
+        .where('status', isEqualTo: 'active')
         .get();
 
     return snapshot.docs.map((doc) => doc.data()).toList();
-  }
-
-  // Get machines by location
-  Future<List<Machine>> getMachinesByLocation(String location) async {
-    final QuerySnapshot snapshot = await getCollection()
-        .where('location', isEqualTo: location)
-        .get();
-
-    return snapshot.docs.map((doc) {
-      final data = doc.data() as Map<String, dynamic>;
-      data['id'] = doc.id;
-      return Machine.fromJson(data);
-    }).toList();
   }
 
   // Check if user has access to machine
@@ -118,7 +142,7 @@ class MachineRepository extends BaseRepository<Machine> {
       }
     }
 
-    // Check if user is in users subcollection
+    // Check if user is in users subcollection and active
     final userDoc = await _firestore
         .collection('machines')
         .doc(machineId)
@@ -126,6 +150,18 @@ class MachineRepository extends BaseRepository<Machine> {
         .doc(userId)
         .get();
 
-    return userDoc.exists;
+    return userDoc.exists && userDoc.data()?['status'] == 'active';
+  }
+
+  // Update user's last access time
+  Future<void> updateUserLastAccess(String machineId, String userId) async {
+    await _firestore
+        .collection('machines')
+        .doc(machineId)
+        .collection('users')
+        .doc(userId)
+        .update({
+          'lastAccess': FieldValue.serverTimestamp(),
+        });
   }
 }
