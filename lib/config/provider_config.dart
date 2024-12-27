@@ -10,6 +10,8 @@ import '../services/navigation_service.dart';
 
 // Repositories
 import '../repositories/system_state_repository.dart';
+import '../repositories/machine_repository.dart';
+import '../modules/system_operation_also_main_module/repositories/recipe_repository.dart';
 import '../features/alarm/repository/alarm_repository.dart';
 
 // Providers
@@ -17,9 +19,11 @@ import '../providers/auth_provider.dart';
 import '../modules/system_operation_also_main_module/providers/component_management_provider.dart';
 import '../modules/system_operation_also_main_module/providers/component_status_provider.dart';
 import '../modules/system_operation_also_main_module/providers/component_values_provider.dart';
+import '../modules/system_operation_also_main_module/providers/component_state_provider.dart';
 import '../modules/system_operation_also_main_module/providers/recipe_provider.dart';
 import '../modules/system_operation_also_main_module/providers/safety_error_provider.dart';
 import '../modules/system_operation_also_main_module/providers/system_state_provider.dart';
+import '../modules/system_operation_also_main_module/providers/machine_provider.dart';
 
 // BLoCs
 import '../features/alarm/bloc/alarm_bloc.dart';
@@ -38,6 +42,14 @@ class ProviderConfig {
     // Repositories
     Provider<SystemStateRepository>(
       create: (_) => SystemStateRepository(),
+    ),
+
+    Provider<MachineRepository>(
+      create: (_) => MachineRepository(),
+    ),
+
+    Provider<RecipeRepository>(
+      create: (_) => RecipeRepository(),
     ),
 
     Provider<AlarmRepository>(
@@ -59,6 +71,14 @@ class ProviderConfig {
       ),
     ),
 
+    // Machine Management
+    ChangeNotifierProvider<MachineProvider>(
+      create: (context) => MachineProvider(
+        context.read<MachineRepository>(),
+        context.read<AuthService>(),
+      ),
+    ),
+
     // Component Management Layer
     ChangeNotifierProvider<ComponentManagementProvider>(
       create: (_) => ComponentManagementProvider(),
@@ -69,17 +89,29 @@ class ProviderConfig {
       create: (_) => ComponentStatusProvider(),
     ),
 
+    // Component State Layer
+    Provider<ComponentStateProvider>(
+      create: (_) => ComponentStateProvider(),
+    ),
+
     // Component Values Layer
-    ChangeNotifierProxyProvider2<ComponentManagementProvider, ComponentStatusProvider, ComponentValuesProvider>(
+    ChangeNotifierProxyProvider3<ComponentManagementProvider, ComponentStatusProvider, ComponentStateProvider, ComponentValuesProvider>(
       create: (_) => ComponentValuesProvider(),
-      update: (_, management, status, previous) {
-        return previous ?? ComponentValuesProvider();
+      update: (_, management, status, stateProvider, previous) {
+        final provider = previous ?? ComponentValuesProvider();
+        if (management != null && status != null && stateProvider != null) {
+          // Update the provider with the latest dependencies
+          provider.updateComponents(management.components);
+          provider.updateStateProvider(stateProvider);
+        }
+        return provider;
       },
     ),
 
     // Recipe Management
     ChangeNotifierProvider<RecipeProvider>(
       create: (context) => RecipeProvider(
+        context.read<RecipeRepository>(),
         context.read<AuthService>(),
       ),
     ),
