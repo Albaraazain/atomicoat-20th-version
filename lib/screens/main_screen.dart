@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../enums/navigation_item.dart';
+import '../enums/user_role.dart';
 import '../widgets/app_drawer.dart';
 import '../modules/system_operation_also_main_module/screens/main_dashboard.dart';
 import '../modules/maintenance_module/screens/maintenance_home_screen.dart';
@@ -13,6 +14,7 @@ import '../modules/maintenance_module/screens/documentation_screen.dart';
 import '../modules/maintenance_module/screens/remote_assistance_screen.dart';
 import '../modules/maintenance_module/screens/safety_procedures_screen.dart';
 import '../modules/system_operation_also_main_module/screens/recipe_management_screen.dart';
+import '../modules/system_operation_also_main_module/screens/machine/machine_list_screen.dart';
 import '../screens/admin_dashboard_screen.dart';
 
 class MainScreen extends StatefulWidget {
@@ -63,11 +65,17 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Widget _getSelectedScreen() {
+    final authProvider = Provider.of<AuthProvider>(context);
+
     switch (_selectedItem) {
       case NavigationItem.mainDashboard:
         return MainDashboard();
       case NavigationItem.adminDashboard:
         return AdminDashboardScreen();
+      case NavigationItem.machineManagement:
+        return MachineListScreen(
+          isSuperAdmin: authProvider.userRole == UserRole.superAdmin,
+        );
       case NavigationItem.recipeManagement:
         return RecipeManagementScreen();
       case NavigationItem.calibration:
