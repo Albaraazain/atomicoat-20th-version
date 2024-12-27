@@ -11,17 +11,28 @@ class Recipe {
   double pressureSetPoint;
   int version;
   DateTime lastModified;
+  String machineId;         // ID of the machine this recipe is for
+  String createdBy;         // ID of the user who created the recipe
+  DateTime createdAt;       // When the recipe was created
+  bool isPublic;           // Whether other researchers can see this recipe
+  String? description;     // Optional description of what this recipe does
 
   Recipe({
     required this.id,
     required this.name,
     required this.steps,
     required this.substrate,
+    required this.machineId,
+    required this.createdBy,
     this.chamberTemperatureSetPoint = 150.0,
     this.pressureSetPoint = 1.0,
     this.version = 1,
     DateTime? lastModified,
-  }) : this.lastModified = lastModified ?? DateTime.now();
+    DateTime? createdAt,
+    this.isPublic = false,
+    this.description,
+  }) : this.lastModified = lastModified ?? DateTime.now(),
+       this.createdAt = createdAt ?? DateTime.now();
 
   factory Recipe.fromJson(Map<String, dynamic> json) {
     return Recipe(
@@ -31,10 +42,17 @@ class Recipe {
           .map((e) => RecipeStep.fromJson(e as Map<String, dynamic>))
           .toList(),
       substrate: json['substrate'] as String,
+      machineId: json['machineId'] as String,
+      createdBy: json['createdBy'] as String,
       chamberTemperatureSetPoint: json['chamberTemperatureSetPoint'] as double? ?? 150.0,
       pressureSetPoint: json['pressureSetPoint'] as double? ?? 1.0,
       version: json['version'] as int? ?? 1,
       lastModified: (json['lastModified'] as Timestamp).toDate(),
+      createdAt: json['createdAt'] != null
+          ? (json['createdAt'] as Timestamp).toDate()
+          : DateTime.now(),
+      isPublic: json['isPublic'] as bool? ?? false,
+      description: json['description'] as String?,
     );
   }
 
@@ -43,10 +61,15 @@ class Recipe {
     'name': name,
     'steps': steps.map((e) => e.toJson()).toList(),
     'substrate': substrate,
+    'machineId': machineId,
+    'createdBy': createdBy,
     'chamberTemperatureSetPoint': chamberTemperatureSetPoint,
     'pressureSetPoint': pressureSetPoint,
     'version': version,
     'lastModified': Timestamp.fromDate(lastModified),
+    'createdAt': Timestamp.fromDate(createdAt),
+    'isPublic': isPublic,
+    'description': description,
   };
 }
 
@@ -142,7 +165,6 @@ class RecipeStep {
         this.subSteps,
     });
 }
-
 enum StepType { loop, valve, purge, setParameter }
 enum ValveType { valveA, valveB }
 
