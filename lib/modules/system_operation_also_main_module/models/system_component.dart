@@ -7,6 +7,12 @@ import 'package:experiment_planner/utils/circular_buffer.dart' as utils;
 typedef ComponentBuffer<T> = utils.CircularBuffer<T>;
 
 enum ComponentStatus { normal, warning, error, ok }
+enum ValveType {
+  inlet,
+  outlet,
+  purge,
+  control
+}
 
 class SystemComponent {
   final String id; // Changed from name to id for unique identification
