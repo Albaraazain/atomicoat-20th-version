@@ -4,6 +4,7 @@ import '../models/data_point.dart';
 import '../../../utils/circular_buffer.dart';
 import 'base_component_provider.dart';
 import 'component_state_provider.dart';
+import '../models/system_component.dart';
 
 typedef ComponentBuffer<T> = CircularBuffer<T>;
 
@@ -14,9 +15,20 @@ class ComponentValuesProvider extends BaseComponentProvider {
   // Configuration
   static const int MAX_DATA_POINTS = 1000;
 
+  ComponentValuesProvider([ComponentStateProvider? stateProvider]) {
+    if (stateProvider != null) {
+      updateStateProvider(stateProvider);
+    }
+  }
+
   // Provider Management
   void updateStateProvider(ComponentStateProvider stateProvider) {
     _stateProvider = stateProvider;
+    // Initialize states for existing components
+    for (var componentId in componentsMap.keys) {
+      _stateProvider?.initializeComponentState(componentId);
+    }
+    notifyListeners();
   }
 
   // Value Management
@@ -221,5 +233,18 @@ class ComponentValuesProvider extends BaseComponentProvider {
   void dispose() {
     _componentValues.clear();
     super.dispose();
+  }
+
+  // Update components from management provider
+  void updateComponents(Map<String, SystemComponent> components) {
+    componentsMap.clear();
+    componentsMap.addAll(components);
+    // Re-initialize states for all components
+    if (_stateProvider != null) {
+      for (var componentId in componentsMap.keys) {
+        _stateProvider?.initializeComponentState(componentId);
+      }
+    }
+    notifyListeners();
   }
 }
