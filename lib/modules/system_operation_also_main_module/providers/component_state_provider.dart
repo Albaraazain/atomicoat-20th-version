@@ -1,10 +1,8 @@
 // lib/modules/system_operation_also_main_module/providers/component_state_provider.dart
 
-import 'package:flutter/foundation.dart';
 import '../models/system_component.dart';
 import '../models/data_point.dart';
 import 'base_component_provider.dart';
-import 'component_management_provider.dart';
 
 class ComponentStateProvider extends BaseComponentProvider {
   final Map<String, ComponentState> _componentStates = {};
