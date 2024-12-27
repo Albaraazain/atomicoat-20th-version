@@ -13,13 +13,14 @@ enum MachineStatus {
 class Machine {
   final String id;               // Unique identifier for the machine
   final String serialNumber;     // Physical serial number
-  final String location;         // Lab/location identifier
+  final String location;         // Lab location identifier
   final String model;           // Model number/name
   final DateTime installDate;    // Installation date
   final MachineStatus status;    // Current operational status
   final String? currentOperator; // ID of current operator (if any)
+  final String? currentExperiment; // ID of current running experiment (if any)
   final DateTime lastMaintenance;// Last maintenance date
-  final Map<String, String> adminUsers; // Map of user IDs to their roles for this machine
+  final String adminId;         // ID of the machine admin
   final bool isActive;          // Whether the machine is active in the system
 
   Machine({
@@ -30,8 +31,9 @@ class Machine {
     required this.installDate,
     this.status = MachineStatus.offline,
     this.currentOperator,
+    this.currentExperiment,
     required this.lastMaintenance,
-    required this.adminUsers,
+    required this.adminId,
     this.isActive = true,
   });
 
@@ -47,8 +49,9 @@ class Machine {
         orElse: () => MachineStatus.offline,
       ),
       currentOperator: json['currentOperator'] as String?,
+      currentExperiment: json['currentExperiment'] as String?,
       lastMaintenance: (json['lastMaintenance'] as Timestamp).toDate(),
-      adminUsers: Map<String, String>.from(json['adminUsers'] as Map),
+      adminId: json['adminId'] as String,
       isActive: json['isActive'] as bool? ?? true,
     );
   }
@@ -61,8 +64,9 @@ class Machine {
     'installDate': Timestamp.fromDate(installDate),
     'status': status.toString().split('.').last,
     'currentOperator': currentOperator,
+    'currentExperiment': currentExperiment,
     'lastMaintenance': Timestamp.fromDate(lastMaintenance),
-    'adminUsers': adminUsers,
+    'adminId': adminId,
     'isActive': isActive,
   };
 
@@ -74,8 +78,9 @@ class Machine {
     DateTime? installDate,
     MachineStatus? status,
     String? currentOperator,
+    String? currentExperiment,
     DateTime? lastMaintenance,
-    Map<String, String>? adminUsers,
+    String? adminId,
     bool? isActive,
   }) {
     return Machine(
@@ -86,8 +91,9 @@ class Machine {
       installDate: installDate ?? this.installDate,
       status: status ?? this.status,
       currentOperator: currentOperator ?? this.currentOperator,
+      currentExperiment: currentExperiment ?? this.currentExperiment,
       lastMaintenance: lastMaintenance ?? this.lastMaintenance,
-      adminUsers: adminUsers ?? Map.from(this.adminUsers),
+      adminId: adminId ?? this.adminId,
       isActive: isActive ?? this.isActive,
     );
   }
