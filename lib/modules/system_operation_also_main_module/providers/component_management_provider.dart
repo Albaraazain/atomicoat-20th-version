@@ -4,9 +4,6 @@ import '../models/system_component.dart';
 import '../models/data_point.dart';
 import 'base_component_provider.dart';
 
-import '../models/system_component.dart';
-import '../models/data_point.dart';
-import 'base_component_provider.dart';
 
 class ComponentManagementProvider extends BaseComponentProvider {
   String? _currentMachineId; // Add current machine context
