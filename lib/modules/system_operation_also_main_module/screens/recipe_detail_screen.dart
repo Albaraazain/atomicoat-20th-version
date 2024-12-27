@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/recipe.dart';
-import '../models/system_component.dart';
 import '../providers/recipe_provider.dart';
-import '../providers/system_state_provider.dart';
-import '../../../services/auth_service.dart';
 
 class DarkThemeColors {
   static const Color background = Color(0xFF121212);
