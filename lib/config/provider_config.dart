@@ -90,7 +90,7 @@ class ProviderConfig {
     ),
 
     // Component State Layer
-    Provider<ComponentStateProvider>(
+    ChangeNotifierProvider<ComponentStateProvider>(
       create: (_) => ComponentStateProvider(),
     ),
 
@@ -99,7 +99,7 @@ class ProviderConfig {
       create: (_) => ComponentValuesProvider(),
       update: (_, management, status, stateProvider, previous) {
         final provider = previous ?? ComponentValuesProvider();
-        if (management != null && status != null && stateProvider != null) {
+        if (status != null) {
           // Update the provider with the latest dependencies
           provider.updateComponents(management.components);
           provider.updateStateProvider(stateProvider);
