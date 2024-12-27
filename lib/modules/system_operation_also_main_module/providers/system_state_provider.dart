@@ -406,8 +406,8 @@ class SystemStateProvider with ChangeNotifier {
   }
 
   // Select a recipe
-  void selectRecipe(String id) {
-    _selectedRecipe = _recipeProvider.getRecipeById(id);
+  Future<void> selectRecipe(String id) async {
+    _selectedRecipe = await _recipeProvider.getRecipeById(id);
     if (_selectedRecipe != null) {
       addLogEntry(
           'Recipe selected: ${_selectedRecipe!.name}', ComponentStatus.normal);
@@ -418,7 +418,7 @@ class SystemStateProvider with ChangeNotifier {
   }
 
   // Emergency stop
-  void emergencyStop() {
+  Future<void> emergencyStop() async {
     String? userId = _authService.currentUserId;
     if (userId == null) return;
 
@@ -426,7 +426,7 @@ class SystemStateProvider with ChangeNotifier {
     for (var component in _componentManager.components.values) {
       if (component.isActivated) {
         _componentManager.deactivateComponent(component.name);
-        _systemStateRepository.saveComponentState(userId, component);
+        await _systemStateRepository.saveComponentState(userId, component);
       }
     }
 
