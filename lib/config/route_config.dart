@@ -7,6 +7,7 @@ import 'package:experiment_planner/screens/main_screen.dart';
 import 'package:experiment_planner/screens/status/loading_screen.dart';
 import 'package:experiment_planner/screens/status/pending_approval_screen.dart';
 import 'package:experiment_planner/screens/status/access_denied_screen.dart';
+import 'package:experiment_planner/enums/user_role.dart';
 
 // Import all screens from maintenance module
 import 'package:experiment_planner/modules/maintenance_module/screens/calibration_screen.dart';
@@ -21,6 +22,7 @@ import 'package:experiment_planner/modules/maintenance_module/screens/troublesho
 import 'package:experiment_planner/modules/system_operation_also_main_module/screens/main_dashboard.dart';
 import 'package:experiment_planner/modules/system_operation_also_main_module/screens/recipe_management_screen.dart';
 import 'package:experiment_planner/modules/system_operation_also_main_module/screens/system_overview_screen.dart';
+import 'package:experiment_planner/modules/system_operation_also_main_module/screens/machine/machine_list_screen.dart';
 
 class RouteConfig {
   static Map<String, Widget Function(BuildContext)> get routes => {
@@ -37,6 +39,12 @@ class RouteConfig {
         '/recipe_management': (context) => RecipeManagementScreen(),
         '/overview': (context) => SystemOverviewScreen(),
         '/admin_dashboard': (context) => AdminDashboardScreen(),
+        '/machine_management': (context) {
+          final authProvider = Provider.of<AuthProvider>(context, listen: false);
+          return MachineListScreen(
+            isSuperAdmin: authProvider.userRole == UserRole.superAdmin,
+          );
+        },
       };
 
   static Widget _handleAuthState(BuildContext context) {

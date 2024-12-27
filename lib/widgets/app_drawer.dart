@@ -17,6 +17,7 @@ class AppDrawer extends StatelessWidget {
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
     final isAdmin = authProvider.userRole == UserRole.admin;
+    final isSuperAdmin = authProvider.userRole == UserRole.superAdmin;
     final isOperator = authProvider.userRole == UserRole.operator;
 
     return Drawer(
@@ -53,7 +54,7 @@ class AppDrawer extends StatelessWidget {
             isSelected: selectedItem == NavigationItem.mainDashboard,
             onTap: () => onSelectItem(NavigationItem.mainDashboard),
           ),
-          if (isAdmin)
+          if (isAdmin || isSuperAdmin) ...[
             _buildDrawerItem(
               context: context,
               icon: Icons.admin_panel_settings,
@@ -61,6 +62,14 @@ class AppDrawer extends StatelessWidget {
               isSelected: selectedItem == NavigationItem.adminDashboard,
               onTap: () => onSelectItem(NavigationItem.adminDashboard),
             ),
+            _buildDrawerItem(
+              context: context,
+              icon: Icons.precision_manufacturing,
+              text: 'Machine Management',
+              isSelected: selectedItem == NavigationItem.machineManagement,
+              onTap: () => onSelectItem(NavigationItem.machineManagement),
+            ),
+          ],
           _buildDrawerItem(
             context: context,
             icon: Icons.book,

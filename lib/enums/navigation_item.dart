@@ -15,6 +15,7 @@ enum NavigationItem {
 
   // System Operation Module
   recipeManagement,
+  machineManagement,
 
   // Others Section
   profile,
@@ -55,7 +56,7 @@ enum NavigationItem {
     // System Diagram View Module
     overview,
     diagramDetails,
-    
+
     adminDashboard,
 }
 */
