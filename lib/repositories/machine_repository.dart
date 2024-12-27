@@ -2,6 +2,7 @@
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../modules/system_operation_also_main_module/models/machine.dart';
+import '../modules/system_operation_also_main_module/models/system_component.dart';
 import 'base_repository.dart';
 
 class MachineRepository extends BaseRepository<Machine> {
@@ -53,18 +54,52 @@ class MachineRepository extends BaseRepository<Machine> {
     }).toList();
   }
 
-  // Get machines by lab
-  Future<List<Machine>> getMachinesByLab(String labName, String institution) async {
-    final QuerySnapshot snapshot = await getCollection()
-        .where('labName', isEqualTo: labName)
-        .where('labInstitution', isEqualTo: institution)
-        .get();
+  // Add or update a component for a machine
+  Future<void> updateMachineComponent(String machineId, SystemComponent component) async {
+    final machineDoc = getCollection().doc(machineId);
+    final machineSnapshot = await machineDoc.get();
 
-    return snapshot.docs.map((doc) {
-      final data = doc.data() as Map<String, dynamic>;
-      data['id'] = doc.id;
-      return Machine.fromJson(data);
-    }).toList();
+    if (!machineSnapshot.exists) {
+      throw Exception('Machine not found');
+    }
+
+    final machine = Machine.fromJson(machineSnapshot.data() as Map<String, dynamic>);
+    final updatedComponents = Map<String, SystemComponent>.from(machine.components);
+    updatedComponents[component.id] = component;
+
+    await machineDoc.update({
+      'components': updatedComponents.map((key, value) => MapEntry(key, value.toJson())),
+    });
+  }
+
+  // Remove a component from a machine
+  Future<void> removeMachineComponent(String machineId, String componentId) async {
+    final machineDoc = getCollection().doc(machineId);
+    final machineSnapshot = await machineDoc.get();
+
+    if (!machineSnapshot.exists) {
+      throw Exception('Machine not found');
+    }
+
+    final machine = Machine.fromJson(machineSnapshot.data() as Map<String, dynamic>);
+    final updatedComponents = Map<String, SystemComponent>.from(machine.components);
+    updatedComponents.remove(componentId);
+
+    await machineDoc.update({
+      'components': updatedComponents.map((key, value) => MapEntry(key, value.toJson())),
+    });
+  }
+
+  // Get all components for a machine
+  Future<Map<String, SystemComponent>> getMachineComponents(String machineId) async {
+    final machineDoc = await getCollection().doc(machineId).get();
+
+    if (!machineDoc.exists) {
+      throw Exception('Machine not found');
+    }
+
+    final machine = Machine.fromJson(machineDoc.data() as Map<String, dynamic>);
+    return machine.components;
   }
 
   // Update machine status
@@ -100,35 +135,40 @@ class MachineRepository extends BaseRepository<Machine> {
         });
   }
 
-  // Update user status (active/inactive)
-  Future<void> updateUserStatus(String machineId, String userId, String status) async {
+  // Remove user from machine
+  Future<void> removeUserFromMachine(String machineId, String userId) async {
     await _firestore
         .collection('machines')
         .doc(machineId)
         .collection('users')
         .doc(userId)
-        .update({
-          'status': status,
-          'lastModified': FieldValue.serverTimestamp(),
-        });
+        .delete();
   }
 
-  // Remove user from machine
-  Future<void> removeUserFromMachine(String machineId, String userId) async {
-    // Instead of deleting, mark as inactive
-    await updateUserStatus(machineId, userId, 'inactive');
-  }
-
-  // Get all active users for a machine
+  // Get users for a machine
   Future<List<Map<String, dynamic>>> getMachineUsers(String machineId) async {
-    final snapshot = await _firestore
+    final usersSnapshot = await _firestore
         .collection('machines')
         .doc(machineId)
         .collection('users')
         .where('status', isEqualTo: 'active')
         .get();
 
-    return snapshot.docs.map((doc) => doc.data()).toList();
+    return usersSnapshot.docs.map((doc) => doc.data()).toList();
+  }
+
+  // Get machines by lab
+  Future<List<Machine>> getMachinesByLab(String labName, String institution) async {
+    final QuerySnapshot snapshot = await getCollection()
+        .where('labName', isEqualTo: labName)
+        .where('labInstitution', isEqualTo: institution)
+        .get();
+
+    return snapshot.docs.map((doc) {
+      final data = doc.data() as Map<String, dynamic>;
+      data['id'] = doc.id;
+      return Machine.fromJson(data);
+    }).toList();
   }
 
   // Check if user has access to machine
