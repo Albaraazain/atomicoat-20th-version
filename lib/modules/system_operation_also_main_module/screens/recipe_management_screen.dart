@@ -4,11 +4,37 @@ import '../models/recipe.dart';
 import '../providers/recipe_provider.dart';
 import 'recipe_detail_screen.dart';
 
-class RecipeManagementScreen extends StatelessWidget {
+class RecipeManagementScreen extends StatefulWidget {
+  @override
+  _RecipeManagementScreenState createState() => _RecipeManagementScreenState();
+}
+
+class _RecipeManagementScreenState extends State<RecipeManagementScreen> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<RecipeProvider>(
       builder: (context, recipeProvider, child) {
+        if (recipeProvider.currentMachineId == null) {
+          return Scaffold(
+            appBar: AppBar(title: Text('Recipe Management')),
+            body: Center(child: Text('Please select a machine first')),
+          );
+        }
+
         return Scaffold(
           appBar: AppBar(
             leading: IconButton(
@@ -21,6 +47,13 @@ class RecipeManagementScreen extends StatelessWidget {
               'Recipe Management',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
+            bottom: TabBar(
+              controller: _tabController,
+              tabs: [
+                Tab(text: 'My Recipes'),
+                Tab(text: 'Public Recipes'),
+              ],
+            ),
             actions: [
               IconButton(
                 icon: Icon(Icons.add, size: 28),
@@ -28,48 +61,92 @@ class RecipeManagementScreen extends StatelessWidget {
               ),
             ],
           ),
-
-          body: Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: ListView.builder(
-              itemCount: recipeProvider.recipes.length,
-              itemBuilder: (context, index) {
-                final recipe = recipeProvider.recipes[index];
-                return Card(
-                  elevation: 2,
-                  margin: EdgeInsets.symmetric(vertical: 8),
-                  child: ListTile(
-                    contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    title: Text(
-                      recipe.name,
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
-                    ),
-                    subtitle: Text(
-                      'Steps: ${recipe.steps.length}',
-                      style: TextStyle(color: Colors.grey[700]),
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: Icon(Icons.edit, color: Colors.blue),
-                          onPressed: () => _navigateToRecipeDetail(context, recipeId: recipe.id),
-                        ),
-                        IconButton(
-                          icon: Icon(Icons.delete, color: Colors.red),
-                          onPressed: () => _confirmDeleteRecipe(context, recipeProvider, recipe),
-                        ),
-                      ],
-                    ),
-                    onTap: () => _showRecipeDetails(context, recipe),
-                  ),
-                );
-              },
-            ),
+          body: TabBarView(
+            controller: _tabController,
+            children: [
+              _buildRecipeList(context, recipeProvider.recipes, recipeProvider, true),
+              _buildRecipeList(context, recipeProvider.publicRecipes, recipeProvider, false),
+            ],
           ),
         );
       },
     );
+  }
+
+  Widget _buildRecipeList(BuildContext context, List<Recipe> recipes, RecipeProvider provider, bool isMyRecipes) {
+    if (recipes.isEmpty) {
+      return Center(
+        child: Text(
+          isMyRecipes ? 'No recipes yet. Create one!' : 'No public recipes available.',
+          style: TextStyle(fontSize: 16, color: Colors.grey),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(8.0),
+      itemCount: recipes.length,
+      itemBuilder: (context, index) {
+        final recipe = recipes[index];
+        return Card(
+          elevation: 2,
+          margin: EdgeInsets.symmetric(vertical: 8),
+          child: ListTile(
+            contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            title: Text(
+              recipe.name,
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  recipe.description ?? 'No description',
+                  style: TextStyle(fontSize: 14),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(Icons.person, size: 16),
+                    SizedBox(width: 4),
+                    Text(recipe.createdBy),
+                    SizedBox(width: 16),
+                    Icon(Icons.access_time, size: 16),
+                    SizedBox(width: 4),
+                    Text(_formatDate(recipe.createdAt)),
+                  ],
+                ),
+              ],
+            ),
+            trailing: isMyRecipes && recipe.createdBy == provider.currentUserId
+                ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: Icon(Icons.edit, color: Colors.blue),
+                        onPressed: () => _navigateToRecipeDetail(context, recipeId: recipe.id),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.delete, color: Colors.red),
+                        onPressed: () => _confirmDeleteRecipe(context, provider, recipe),
+                      ),
+                    ],
+                  )
+                : IconButton(
+                    icon: Icon(Icons.copy, color: Colors.blue),
+                    onPressed: () => _cloneRecipe(context, provider, recipe),
+                  ),
+            onTap: () => _showRecipeDetails(context, recipe),
+          ),
+        );
+      },
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.day}/${date.month}/${date.year}';
   }
 
   void _navigateToRecipeDetail(BuildContext context, {String? recipeId}) async {
@@ -81,7 +158,6 @@ class RecipeManagementScreen extends StatelessWidget {
     );
 
     if (result == true) {
-      // Recipe was saved, refresh the list
       Provider.of<RecipeProvider>(context, listen: false).loadRecipes();
     }
   }
@@ -91,20 +167,46 @@ class RecipeManagementScreen extends StatelessWidget {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text(
-            'Confirm Delete',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-          content: Text('Are you sure you want to delete the recipe "${recipe.name}"?'),
-          actions: <Widget>[
+          title: Text('Confirm Delete'),
+          content: Text('Are you sure you want to delete "${recipe.name}"?'),
+          actions: [
             TextButton(
               child: Text('Cancel'),
               onPressed: () => Navigator.of(context).pop(),
             ),
             TextButton(
-              child: Text('Delete'),
+              child: Text('Delete', style: TextStyle(color: Colors.red)),
               onPressed: () {
                 provider.deleteRecipe(recipe.id);
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _cloneRecipe(BuildContext context, RecipeProvider provider, Recipe recipe) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        final nameController = TextEditingController(text: '${recipe.name} (Copy)');
+        return AlertDialog(
+          title: Text('Clone Recipe'),
+          content: TextField(
+            controller: nameController,
+            decoration: InputDecoration(labelText: 'New Recipe Name'),
+          ),
+          actions: [
+            TextButton(
+              child: Text('Cancel'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            TextButton(
+              child: Text('Clone'),
+              onPressed: () async {
+                await provider.cloneRecipe(recipe, nameController.text);
                 Navigator.of(context).pop();
               },
             ),
@@ -119,27 +221,30 @@ class RecipeManagementScreen extends StatelessWidget {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text(
-            recipe.name,
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
+          title: Text(recipe.name),
           content: SingleChildScrollView(
-            child: ListBody(
-              children: <Widget>[
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (recipe.description != null) ...[
+                  Text('Description:', style: TextStyle(fontWeight: FontWeight.bold)),
+                  Text(recipe.description!),
+                  SizedBox(height: 16),
+                ],
                 Text('Substrate: ${recipe.substrate}'),
-                SizedBox(height: 10),
-                Text(
-                  'Steps:',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
+                Text('Temperature: ${recipe.chamberTemperatureSetPoint}°C'),
+                Text('Pressure: ${recipe.pressureSetPoint} atm'),
+                SizedBox(height: 16),
+                Text('Steps:', style: TextStyle(fontWeight: FontWeight.bold)),
                 ...recipe.steps.map((step) => Padding(
-                  padding: EdgeInsets.only(left: 10, top: 5),
-                  child: Text('- ${_getStepDescription(step)}', style: TextStyle(fontSize: 14)),
+                  padding: EdgeInsets.only(left: 16, top: 4),
+                  child: Text('• ${_getStepDescription(step)}'),
                 )).toList(),
               ],
             ),
           ),
-          actions: <Widget>[
+          actions: [
             TextButton(
               child: Text('Close'),
               onPressed: () => Navigator.of(context).pop(),
